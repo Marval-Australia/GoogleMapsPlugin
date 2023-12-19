@@ -1,0 +1,248 @@
+<script src="Template.js"></script>
+
+<template id="list">
+    <style>
+        .marval-software-plugins-maps-integration {
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            top: 26px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        .marval-software-plugins-maps-integration>input {
+            box-sizing: border-box;
+            flex-shrink: 0;
+            padding: 10px;
+            width: 100%;
+            border: 0;
+            border-bottom: 1px solid #000;
+            outline: none;
+        }
+
+        .marval-software-plugins-maps-integration>ul {
+            flex: 1;
+            overflow: auto;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li:nth-child(even) {
+            background: #E8F1FF;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li>*+* {
+            margin-left: 10px;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li>input {
+            flex-shrink: 0;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li>span {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li.isComplete>span {
+            text-decoration: line-through;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li>a {
+            display: block;
+            flex-shrink: 0;
+            visibility: hidden;
+            color: #F00;
+            text-decoration: none;
+        }
+
+        .marval-software-plugins-maps-integration>ul>li:hover>a {
+            visibility: visible;
+        }
+    </style>
+
+    <div class="marval-software-plugins-maps-integration">
+        <input type="text" placeholder="What needs doing?" />
+        <ul></ul>
+    </div>
+</template>
+
+<template id="toDo">
+    <li>
+        <input type="checkbox" />
+        <span></span>
+        <a href="javascript:void(0);">Delete</a>
+    </li>
+</template>
+<script src="https://code.jquery.com/jquery-2.2.4.min.js"
+    integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+<script>
+    var that = this;
+    
+    (function () {
+        //  console.log("Starting the Main function");
+        var MarvalSoftware = window.top.MarvalSoftware;
+        var $ = window.top.$;
+        $(document).keypress(function (event) {
+
+            var keycode = (event.keyCode ? event.keyCode : event.which);
+            if (keycode == '13') {
+                alert('You pressed a "enter" key in somewhere');
+            }
+        });
+        MarvalSoftware.Plugins.define("marval-software-plugins-maps-integration",
+            {
+                _attributeEntererElement: null,
+                _element: null,
+                _textElement: null,
+                _textElementLocation: "1",
+                _listElement: null,
+                init: function () {
+
+      
+                    this._requestNumber = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getPage().getRequestNumber();
+                    this._pageObject = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getPage();
+                    this._setUpQuickMenu();
+
+                    this._textElementLocation = $("#ctl00_cph_location_selectedText");
+
+                    // For testing request only, this is run from the MapsDisplay.html index.js file.
+
+                    // $.ajax({
+                    //     type: "GET",
+                    //     url: this._getPluginPath() + "Handler.ashx?settingToRetrieve=databaseValue&host=" + window.location.protocol + "//" + window.location.host,
+                    //     contentType: "application/json; charset=utf-8",
+                    //     dataType: "json",
+                    //     success: function (result1) {
+                    //         console.log("Have result as ", result1);
+                    //     }
+                    //     })
+                },
+                _getPluginPath: function () {
+                    return this.attributes["data-pluginpath"].value;
+                },
+                _setUpQuickMenu: function () {
+                    var that = this;
+                    function fetchGoogleAPIKey() {
+        //var PluginPath = that.attributes["data-pluginpath"].value;
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: that._getPluginPath() + "Handler.ashx?settingToRetrieve=GoogleMapsAPIKey",
+                method: 'GET',
+                dataType: 'text',
+                success: function (response) {
+                   
+                    resolve(response);
+                },
+                error: function (error) {
+                    reject(error);
+                }
+            });
+        });
+                    }
+                    console.log("Setting up quick menu");
+                    var styleElement = window.top.document.createElement("style");
+                    window.top.document.body.appendChild(styleElement);
+                    styleElement.sheet.insertRule(".marval-software-plugins-maps-integration-quick-menu-item { background-image: url(" + this.dataset.pluginpath + "icon_32.png); }", 0);
+                    var quickMenuId = window.top.document.querySelector(".quickMenu").id;
+                    var quickMenu = MarvalSoftware.UI.Controls.ScriptManager.getInstance().getControl(quickMenuId);
+                    quickMenu.addMenuItem({
+                        Identifier: "marval-software-plugins-maps-integration",
+                        Label: "Maps",
+                        HRef: "javascript:void(0);",
+                        CssClass: "marval-software-plugins-maps-integration-quick-menu-item"
+                    });
+                    quickMenu.onMenuItemClicked.subscribe(function (sender, e) {
+                        if (e.menuItem.getIdentifier() == "marval-software-plugins-maps-integration") {
+                            const regex = /(\d+(\.\d+){1,2})/;
+                            const match = this._getPluginPath().match(regex);
+                            fetchGoogleAPIKey()
+                                .then((APIKey) => {
+                                    var navigationAddress = window.location.protocol + "//" + window.location.host + this._getPluginPath() + 'MapsDisplay.html?key=' + APIKey + '&version=' + match[0];
+                                    window.open(navigationAddress, '_blank');
+                                })
+                                .catch((error) => {
+                                    console.error('Error fetching data:', error);
+                                });
+                            // console.log("Navigating to " + navigationAddress);
+                            
+                            // window.top.location.href = navigationAddress
+                        }
+                    }, this);
+                },
+                _showErrorMessage: function (errorMessage) {
+                    MarvalSoftware.UI.MessageBox.show(
+                        "Configuration Error",
+                        errorMessage,
+                        MarvalSoftware.UI.MessageBox.Types.ERROR,
+                        null,
+                        null,
+                        400
+                    );
+                },
+                _popup: function () {
+
+                },
+                _renderElement: function () {
+                    var listTemplate = document.querySelector("#list").content;
+                    this._element = window.top.document.importNode(listTemplate, true);
+                    this._textElement = this._element.querySelector("input");
+                    this._textElement.addEventListener("keydown", this._textElement_keydown.bind(this));
+                    this._listElement = this._element.querySelector("ul");
+                    this._listElement.addEventListener("click", this._listElement_click.bind(this));
+                    this.appendChild(this._element);
+                },
+                _getToDoElementIndex: function (toDoElement) {
+                    return Array.prototype.indexOf.call(toDoElement.parentNode.children, toDoElement);
+                },
+                _textElement_keydown: function (e) {
+                    if (e.keyCode == 13 && this._textElement.value !== "") {
+                        e.preventDefault();
+                    }
+                },
+                _textElementLocation_keydown: function (e) {
+                    var locationBoxValue = $("#ctl00_cph_location_selectedText").val();
+                    if (locationBoxValue !== "") {
+                        e.preventDefault();
+                        var valueOfTextBox = $("#ctl00_cph_location_parentLocations").val();
+                        var lastIdentifier;
+                        var objTB = JSON.parse(valueOfTextBox);
+                        $.each(objTB, function (i, val) {
+                            $.each(val, function (p, val1) {
+                                if (p == "Identifier") {
+                                    lastIdentifier = val1;
+                                }
+                            })
+                        })
+                        if (lastIdentifier !== null && lastIdentifier !== '') {
+                            $.ajax({
+                                type: "GET",
+                                url: this._getPluginPath() + "Handler.ashx?settingToRetrieve=databaseValue&lastLocation=" + lastIdentifier,
+                                contentType: "application/json; charset=utf-8",
+                                dataType: "json",
+                                success: function (result1) {
+                                    var fullLocString = "";
+                                    $("#ctl00_cph_location_selectedText").val("Hello world text box");
+                                    $.each(result1.reverse(), function (i, val) {
+                                        $.each(val, function (i2, val2) {
+                                            fullLocString = val2 + " - " + fullLocString;
+                                        })
+                                        $("#ctl00_cph_location_selectedText").val(fullLocString);
+                                    })
+                                }
+                            });
+                        }
+                    }
+                },
+            });
+    })();
+</script>
