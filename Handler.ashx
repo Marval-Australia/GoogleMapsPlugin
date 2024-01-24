@@ -31,7 +31,8 @@ public class Handler : PluginHandler
     private string DBName { get; set; }
     private string MarvalHost { get; set; }
     private string AssignmentGroups { get; set; }
-    private string ExcludeDescriptionMatch { get; set; }                            
+    private string ExcludeDescriptionMatch { get; set; }       
+    private string IncludeOnlyRequestTypes { get; set; }                        
     private string DBConnectionStringFromConfig { get { return this.GlobalSettings["DBConnectionString"]; } }
     private string GoogleMapsAPIKey { get { return this.GlobalSettings["GoogleMapsAPIKey"]; } }
 
@@ -92,6 +93,7 @@ public class Handler : PluginHandler
     {
         List<object> customers = new List<object>();
         string connString = GetDBString();
+        string requestTypeExclusionText = "";
         using (SqlConnection conn = new SqlConnection())
         {
             conn.ConnectionString = connString;
@@ -101,8 +103,19 @@ public class Handler : PluginHandler
                 // cmd.CommandText = "dbo.location_getAllParts";
                 string[] AssignmentGroupsNames = AssignmentGroups.Split(',');
                 string[] ExcludeDescriptionMatches = ExcludeDescriptionMatch.Split(',');
-
-                cmd.CommandText = "SELECT CONCAT(list_requests.requestType_acronym,'-',list_requests.requestNumber) as RequestNumberFull,list_requests.assignee_primaryGroup_name,requestNumber,list_requests.description,STRING_AGG([CIAttributeType].name,',') AS GeogName,STRING_AGG([CIAttributeValue].textValue,',') AS textValue FROM list_requests LEFT JOIN [CIAttributeValue] ON [CIAttributeValue].CIId = list_requests.contact_id  LEFT JOIN [CIAttributeType] ON [CIAttributeType].CIAttrTypeId = CIAttributeValue.CIAttrTypeId  WHERE list_requests.contact_id IN (SELECT ciid FROM [CIAttributeValue] LEFT JOIN [CIAttributeType] ON [CIAttributeValue].CIAttrTypeId =  [CIAttributeType].CIAttrTypeId WHERE [CIAttributeType].name IN ('Latitude','Longitude') ) AND list_requests.status_name NOT IN ('Closed','Resolved','Completed','Change Closed') AND CIAttributeValue.textValue IS NOT NULL AND [CIAttributeType].name IN  ('Latitude','Longitude') GROUP BY list_requests.requestNumber,list_requests.description,list_requests.assignee_primaryGroup_name,CONCAT(list_requests.requestType_acronym,'-',list_requests.requestNumber)";
+                string InclRequestTypesResString = "";
+                char[] charsToTrim = { ',' };
+                if(String.IsNullOrEmpty(IncludeOnlyRequestTypes)) {
+                } else { 
+                        string[] InclReqTypeString = IncludeOnlyRequestTypes.Split(','); 
+                        
+                        foreach (string requestTypeItem in InclReqTypeString) {
+                            InclRequestTypesResString = InclRequestTypesResString + "'" + requestTypeItem + "'" + ",";
+                        }
+                        InclRequestTypesResString = InclRequestTypesResString.TrimEnd(charsToTrim);
+                        requestTypeExclusionText = "AND list_requests.requestType_acronym IN (" + InclRequestTypesResString + ") ";
+                }
+                cmd.CommandText = "SELECT CONCAT(list_requests.requestType_acronym,'-',list_requests.requestNumber) as RequestNumberFull,list_requests.assignee_primaryGroup_name,requestNumber,list_requests.description,STRING_AGG([CIAttributeType].name,',') AS GeogName,STRING_AGG([CIAttributeValue].textValue,',') AS textValue FROM list_requests LEFT JOIN [CIAttributeValue] ON [CIAttributeValue].CIId = list_requests.contact_id  LEFT JOIN [CIAttributeType] ON [CIAttributeType].CIAttrTypeId = CIAttributeValue.CIAttrTypeId  WHERE list_requests.contact_id IN (SELECT ciid FROM [CIAttributeValue] LEFT JOIN [CIAttributeType] ON [CIAttributeValue].CIAttrTypeId =  [CIAttributeType].CIAttrTypeId WHERE [CIAttributeType].name IN ('Latitude','Longitude') ) " + requestTypeExclusionText + " AND list_requests.status_name NOT IN ('Closed','Resolved','Completed','Change Closed') AND CIAttributeValue.textValue IS NOT NULL AND [CIAttributeType].name IN  ('Latitude','Longitude') GROUP BY list_requests.requestNumber,list_requests.description,list_requests.assignee_primaryGroup_name,CONCAT(list_requests.requestType_acronym,'-',list_requests.requestNumber)";
                 // cmd.CommandType = System.Data.CommandType.StoredProcedure; // Defaults to SQL command
                 // cmd.Parameters.AddWithValue("@locationId", locationId);
                 cmd.Connection = conn;
@@ -180,6 +193,7 @@ public class Handler : PluginHandler
         AssignmentGroups = this.GlobalSettings["IncludeAssigneePrimaryGroup"];
         this.MarvalHost = context.Request.Params["host"] ?? string.Empty;
         ExcludeDescriptionMatch = this.GlobalSettings["ExcludeDescriptionMatch"];
+        IncludeOnlyRequestTypes = this.GlobalSettings["IncludeOnlyRequestTypes"];
 
         switch (param)
         {
